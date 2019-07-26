@@ -1,0 +1,2 @@
+(library (name ppx_python_test) (libraries core)
+ (preprocess (pps ppx_jane ppx_python_conv)))
