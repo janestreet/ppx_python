@@ -10,6 +10,14 @@ let default =
     (fun x -> x)
 ;;
 
+let option =
+  Attribute.declare
+    "python.option"
+    Attribute.Context.label_declaration
+    Ast_pattern.(pstr nil)
+    (fun x -> x)
+;;
+
 let lident ~loc str = Loc.make ~loc (Lident str)
 
 let fresh_label =
@@ -159,9 +167,12 @@ end = struct
           match Attribute.get default field with
           | Some default -> default
           | None ->
-            [%expr
-              Printf.sprintf "cannot find field %s in dict" [%e name_as_string]
-              |> failwith]
+            (match Attribute.get option field with
+             | Some _ -> [%expr None]
+             | None ->
+               [%expr
+                 Printf.sprintf "cannot find field %s in dict" [%e name_as_string]
+                 |> failwith])
         in
         let expr =
           [%expr
@@ -237,13 +248,40 @@ end = struct
   ;;
 
   let to_python_fields fields ~loc v =
-    let fields =
-      List.map fields ~f:(fun field ->
+    let mandatory_fields, optional_fields =
+      List.partition_tf fields ~f:(fun field ->
+        Attribute.get option field |> Option.is_none)
+    in
+    let mandatory_fields =
+      List.map mandatory_fields ~f:(fun field ->
         let name_as_string = estring ~loc field.pld_name.txt in
         let value = pexp_field v (lident ~loc field.pld_name.txt) ~loc in
         [%expr [%e name_as_string], [%e to_python_ty field.pld_type value]])
     in
-    app_list ~loc [%expr Py.Dict.of_bindings_string] fields
+    let mandatory_dict =
+      app_list ~loc [%expr Py.Dict.of_bindings_string] mandatory_fields
+    in
+    if List.is_empty optional_fields
+    then mandatory_dict
+    else (
+      let optional_setters =
+        List.map optional_fields ~f:(fun field ->
+          let name_as_string = estring ~loc field.pld_name.txt in
+          let value = pexp_field v (lident ~loc field.pld_name.txt) ~loc in
+          let pat_ident = lident ~loc "pat_value" |> pexp_ident ~loc in
+          [%expr
+            match [%e value] with
+            | None -> ()
+            | Some _ as pat_value ->
+              Py.Dict.set_item_string
+                dict
+                [%e name_as_string]
+                [%e to_python_ty field.pld_type pat_ident]])
+      in
+      [%expr
+        let dict = [%e mandatory_dict] in
+        [%e esequence ~loc optional_setters];
+        dict])
   ;;
 
   let to_python_variant variant ~loc v =

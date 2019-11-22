@@ -251,3 +251,27 @@ let%expect_test "default" =
   printf !"%{sexp:t_with_default}\n%!" t_with_default;
   [%expect {| ((field_a 1337) (field_b foo)) |}]
 ;;
+
+type t_with_option =
+  { field_a : int
+  ; field_b : (string * float) option [@python.option]
+  ; field_c : int option [@python.option]
+  }
+[@@deriving python, sexp]
+
+let%expect_test "option" =
+  if not (Py.is_initialized ()) then Py.initialize ~version:3 ();
+  let t_with_option = { field_a = 42; field_b = Some ("foo", 3.14); field_c = None } in
+  let pyobject = python_of_t_with_option t_with_option in
+  print_endline (Py.Object.to_string pyobject);
+  [%expect {| {'field_a': 42, 'field_b': ('foo', 3.14)} |}];
+  let t_with_option = t_with_option_of_python pyobject in
+  printf !"%{sexp:t_with_option}\n%!" t_with_option;
+  [%expect {| ((field_a 42) (field_b ((foo 3.14))) (field_c ())) |}];
+  let pyobject = Py.Dict.create () in
+  Py.Dict.set_item_string pyobject "field_a" (python_of_int 1337);
+  Py.Dict.set_item_string pyobject "field_c" (python_of_int 42);
+  let t_with_option = t_with_option_of_python pyobject in
+  printf !"%{sexp:t_with_option}\n%!" t_with_option;
+  [%expect {| ((field_a 1337) (field_b ()) (field_c (42))) |}]
+;;
