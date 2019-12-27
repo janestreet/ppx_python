@@ -54,13 +54,13 @@ let list = [%of_python: (int * string) list] pyobject;;
 Conversions
 -----------
 
-The conversion is straitghtforward for basic types such as `int`, `float`, `bool`, or `string`.
+The conversion is straightforward for basic types such as `int`, `float`, `bool`, or `string`.
 `unit` is converted to `None`.
 
 OCaml tuples are converted into Python tuples. OCaml lists and arrays are converted in Python lists.
 
 For options, `None` is used on the Python side to represent the `None` case. Otherwise the value is
-directly available. Note that this makes ocaml values `Some None` and `None` indistinguisable on the
+directly available. Note that this makes ocaml values `Some None` and `None` indistinguishable on the
 Python side.
 
 Records are represented using Python dictionaries which keys are strings. The `[@python.default]`
