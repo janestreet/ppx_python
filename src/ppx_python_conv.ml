@@ -52,6 +52,7 @@ let fun_multi ~loc (args : label list) (body : expression) =
 ;;
 
 let closure_of_fn (fn : expression -> expression) ~loc : expression =
+  let loc = { loc with loc_ghost = true } in
   let arg_pat, arg_expr = fresh_label ~loc in
   pexp_fun Nolabel ~loc None arg_pat (fn arg_expr)
 ;;
@@ -115,7 +116,7 @@ end = struct
   ;;
 
   let rec handle_core_type ~tuple ~var ~constr ct v =
-    let loc = ct.ptyp_loc in
+    let loc = { ct.ptyp_loc with loc_ghost = true } in
     match ct.ptyp_desc with
     | Ptyp_tuple core_types -> tuple ~loc core_types v
     | Ptyp_var tv -> [%expr [%e pexp_ident ~loc (lident (var tv) ~loc)] [%e v]]
