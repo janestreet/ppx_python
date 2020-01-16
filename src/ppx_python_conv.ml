@@ -398,8 +398,8 @@ module Python_of = struct
   let deriver =
     Deriving.add
       name
-      ~str_type_decl:(Structure.gen `of_)
-      ~sig_type_decl:(Signature.gen `of_)
+      ~str_type_decl:(Structure.gen `to_)
+      ~sig_type_decl:(Signature.gen `to_)
       ~extension
   ;;
 end
@@ -411,8 +411,8 @@ module Of_python = struct
   let deriver =
     Deriving.add
       name
-      ~str_type_decl:(Structure.gen `to_)
-      ~sig_type_decl:(Signature.gen `to_)
+      ~str_type_decl:(Structure.gen `of_)
+      ~sig_type_decl:(Signature.gen `of_)
       ~extension
   ;;
 end

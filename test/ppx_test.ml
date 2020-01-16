@@ -275,3 +275,33 @@ let%expect_test "option" =
   printf !"%{sexp:t_with_option}\n%!" t_with_option;
   [%expect {| ((field_a 1337) (field_b ()) (field_c (42))) |}]
 ;;
+
+type t_python_of =
+  { foo : int
+  ; bar : float option
+  }
+[@@deriving python_of]
+
+let%expect_test "python-of" =
+  if not (Py.is_initialized ()) then Py.initialize ~version:3 ();
+  let t = { foo = 42; bar = Some 3.1415 } in
+  let pyobject = python_of_t_python_of t in
+  print_endline (Py.Object.to_string pyobject);
+  [%expect {| {'foo': 42, 'bar': 3.1415} |}]
+;;
+
+type t_of_python =
+  { foo : int
+  ; bar : float option
+  }
+[@@deriving of_python, sexp]
+
+let%expect_test "python-of" =
+  if not (Py.is_initialized ()) then Py.initialize ~version:3 ();
+  let pyobject = Py.Dict.create () in
+  Py.Dict.set_item_string pyobject "foo" (python_of_int 1337);
+  Py.Dict.set_item_string pyobject "bar" (python_of_float 2.71828182846);
+  let t = t_of_python_of_python pyobject in
+  printf !"%{sexp:t_of_python}\n%!" t;
+  [%expect {| ((foo 1337) (bar (2.71828182846))) |}]
+;;
