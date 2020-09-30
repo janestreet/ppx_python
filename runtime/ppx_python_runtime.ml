@@ -22,3 +22,29 @@ let python_of_option f = function
 let option_of_python f pyobject =
   if Caml.( = ) pyobject Py.none then None else Some (f pyobject)
 ;;
+
+module Dict_str_keys = struct
+  type t = Pytypes.pyobject
+
+  let internalized_keys = Hashtbl.create (module String)
+
+  let internalized_key key =
+    Hashtbl.findi_or_add internalized_keys key ~default:python_of_string
+  ;;
+
+  let set t key value =
+    let key = internalized_key key in
+    Py.Dict.set_item t key value
+  ;;
+
+  let find t key =
+    let key = internalized_key key in
+    Py.Dict.find t key
+  ;;
+
+  let create assoc =
+    let t = Py.Dict.create () in
+    List.iter assoc ~f:(fun (key, value) -> set t key value);
+    t
+  ;;
+end

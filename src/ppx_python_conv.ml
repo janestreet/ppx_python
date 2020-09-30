@@ -177,7 +177,7 @@ end = struct
         in
         let expr =
           [%expr
-            match Py.Dict.find_string [%e v] [%e name_as_string] with
+            match Ppx_python_runtime.Dict_str_keys.find [%e v] [%e name_as_string] with
             | exception (Caml.Not_found | Not_found_s _) -> [%e default_branch]
             | v -> [%e of_python_ty field.pld_type [%expr v]]]
         in
@@ -260,7 +260,7 @@ end = struct
         [%expr [%e name_as_string], [%e to_python_ty field.pld_type value]])
     in
     let mandatory_dict =
-      app_list ~loc [%expr Py.Dict.of_bindings_string] mandatory_fields
+      app_list ~loc [%expr Ppx_python_runtime.Dict_str_keys.create] mandatory_fields
     in
     if List.is_empty optional_fields
     then mandatory_dict
@@ -274,7 +274,7 @@ end = struct
             match [%e value] with
             | None -> ()
             | Some _ as pat_value ->
-              Py.Dict.set_item_string
+              Ppx_python_runtime.Dict_str_keys.set
                 dict
                 [%e name_as_string]
                 [%e to_python_ty field.pld_type pat_ident]])

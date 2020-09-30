@@ -14,3 +14,11 @@ val python_of_list : ('a -> pyobject) -> 'a list -> pyobject
 val list_of_python : (pyobject -> 'a) -> pyobject -> 'a list
 val python_of_option : ('a -> pyobject) -> 'a option -> pyobject
 val option_of_python : (pyobject -> 'a) -> pyobject -> 'a option
+
+module Dict_str_keys : sig
+  type t = pyobject
+
+  val create : (string * pyobject) list -> t
+  val set : t -> string -> pyobject -> unit
+  val find : t -> string -> pyobject
+end
