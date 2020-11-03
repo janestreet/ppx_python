@@ -48,3 +48,5 @@ module Dict_str_keys = struct
     t
   ;;
 end
+
+exception Not_found_s = Base.Not_found_s
