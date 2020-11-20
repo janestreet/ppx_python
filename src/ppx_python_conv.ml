@@ -309,31 +309,27 @@ end = struct
     pexp_match ~loc v match_cases
   ;;
 
-  let expr_of_tds ~loc ~tvar_wrapper ~type_expr ~variant ~record tds =
-    let exprs =
-      List.map tds ~f:(fun td ->
-        let { Location.loc; txt = _ } = td.ptype_name in
-        let tvars =
-          List.map td.ptype_params ~f:(fun (te, _variance) ->
-            match te.ptyp_desc with
-            | Ptyp_var lbl -> tvar_wrapper lbl
-            | _ ->
-              (* we've called [name_type_params_in_td] *)
-              assert false)
-        in
-        let expr arg_t =
-          match td.ptype_kind with
-          | Ptype_abstract ->
-            (match td.ptype_manifest with
-             | None -> raise_errorf ~loc "abstract types not yet supported"
-             | Some ty -> type_expr ty arg_t)
-          | Ptype_variant cstrs -> variant cstrs ~loc arg_t
-          | Ptype_record fields -> record fields ~loc arg_t
-          | Ptype_open -> raise_errorf ~loc "open types not yet supported"
-        in
-        fun_multi ~loc tvars (closure_of_fn expr ~loc))
+  let expr_of_td ~tvar_wrapper ~type_expr ~variant ~record td =
+    let { Location.loc; txt = _ } = td.ptype_name in
+    let tvars =
+      List.map td.ptype_params ~f:(fun (te, _variance) ->
+        match te.ptyp_desc with
+        | Ptyp_var lbl -> tvar_wrapper lbl
+        | _ ->
+          (* we've called [name_type_params_in_td] *)
+          assert false)
     in
-    pexp_tuple ~loc exprs
+    let expr arg_t =
+      match td.ptype_kind with
+      | Ptype_abstract ->
+        (match td.ptype_manifest with
+         | None -> raise_errorf ~loc "abstract types not yet supported"
+         | Some ty -> type_expr ty arg_t)
+      | Ptype_variant cstrs -> variant cstrs ~loc arg_t
+      | Ptype_record fields -> record fields ~loc arg_t
+      | Ptype_open -> raise_errorf ~loc "open types not yet supported"
+    in
+    fun_multi ~loc tvars (closure_of_fn expr ~loc)
   ;;
 
   let gen kind =
@@ -343,42 +339,46 @@ end = struct
       | `to_ -> []
     in
     Deriving.Generator.make_noarg ~attributes (fun ~loc ~path:_ (rec_flag, tds) ->
-      let mk_pat mk_ =
-        let pats =
-          List.map tds ~f:(fun td ->
-            let { Location.loc; txt = tname } = td.ptype_name in
-            let name = mk_ tname in
-            ppat_var ~loc (Loc.make name ~loc))
-        in
-        ppat_tuple ~loc pats
-      in
       let tds = List.map tds ~f:name_type_params_in_td in
-      let of_python_expr =
-        expr_of_tds
-          ~loc
-          ~tvar_wrapper:of_python_arg
-          ~type_expr:of_python_ty
-          ~variant:of_python_variant
-          ~record:(of_python_fields ~wrap:Fn.id)
-          tds
+      let of_python_bindings () =
+        List.map tds ~f:(fun td ->
+          let pat =
+            let { Location.loc; txt = tname } = td.ptype_name in
+            let name = of_python tname in
+            ppat_var ~loc (Loc.make name ~loc)
+          in
+          let expr =
+            expr_of_td
+              ~tvar_wrapper:of_python_arg
+              ~type_expr:of_python_ty
+              ~variant:of_python_variant
+              ~record:(of_python_fields ~wrap:Fn.id)
+              td
+          in
+          value_binding ~loc ~pat ~expr)
       in
-      let to_python_expr =
-        expr_of_tds
-          ~loc
-          ~tvar_wrapper:python_of_arg
-          ~type_expr:to_python_ty
-          ~variant:to_python_variant
-          ~record:to_python_fields
-          tds
+      let to_python_bindings () =
+        List.map tds ~f:(fun td ->
+          let pat =
+            let { Location.loc; txt = tname } = td.ptype_name in
+            let name = python_of tname in
+            ppat_var ~loc (Loc.make name ~loc)
+          in
+          let expr =
+            expr_of_td
+              ~tvar_wrapper:python_of_arg
+              ~type_expr:to_python_ty
+              ~variant:to_python_variant
+              ~record:to_python_fields
+              td
+          in
+          value_binding ~loc ~pat ~expr)
       in
       let bindings =
         match kind with
-        | `both ->
-          [ value_binding ~loc ~pat:(mk_pat python_of) ~expr:to_python_expr
-          ; value_binding ~loc ~pat:(mk_pat of_python) ~expr:of_python_expr
-          ]
-        | `to_ -> [ value_binding ~loc ~pat:(mk_pat python_of) ~expr:to_python_expr ]
-        | `of_ -> [ value_binding ~loc ~pat:(mk_pat of_python) ~expr:of_python_expr ]
+        | `both -> to_python_bindings () @ of_python_bindings ()
+        | `to_ -> to_python_bindings ()
+        | `of_ -> of_python_bindings ()
       in
       [ pstr_value ~loc (really_recursive rec_flag tds) bindings ])
   ;;

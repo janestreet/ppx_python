@@ -305,3 +305,101 @@ let%expect_test "python-of" =
   printf !"%{sexp:t_of_python}\n%!" t;
   [%expect {| ((foo 1337) (bar (2.71828182846))) |}]
 ;;
+
+module Recursive_type : sig
+  (* Export the type to check the mli generation too. *)
+  type 'a l =
+    | Empty
+    | Cons of 'a * 'a l
+  [@@deriving python]
+
+  type int_tree =
+    | Leaf of int
+    | Node of int tree * int tree
+  [@@deriving python]
+end = struct
+  type 'a l =
+    | Empty
+    | Cons of 'a * 'a l
+  [@@deriving python, sexp]
+
+  let%expect_test "rec" =
+    if not (Py.is_initialized ()) then Py.initialize ~version:3 ();
+    List.iter
+      [ Empty; Cons ("foo", Empty); Cons ("foo", Cons ("bar", Empty)) ]
+      ~f:(fun l ->
+        printf !"%{sexp:string l}\n%!" l;
+        let pyobject = python_of_l python_of_string l in
+        print_endline (Py.Object.to_string pyobject);
+        printf !"%{sexp:string l}\n%!" (l_of_python string_of_python pyobject));
+    [%expect
+      {|
+      Empty
+      ('Empty', None)
+      Empty
+      (Cons foo Empty)
+      ('Cons', ('foo', ('Empty', None)))
+      (Cons foo Empty)
+      (Cons foo (Cons bar Empty))
+      ('Cons', ('foo', ('Cons', ('bar', ('Empty', None)))))
+      (Cons foo (Cons bar Empty)) |}]
+  ;;
+
+  type int_tree =
+    | Leaf of int
+    | Node of int tree * int tree
+  [@@deriving python, sexp]
+
+  let%expect_test "rec" =
+    if not (Py.is_initialized ()) then Py.initialize ~version:3 ();
+    List.iter
+      [ Leaf 42
+      ; Node (Leaf 1, Leaf 2)
+      ; Node (Node (Leaf 1, Node (Leaf 2, Leaf 3)), Leaf 4)
+      ]
+      ~f:(fun tree ->
+        printf !"%{sexp:int_tree}\n%!" tree;
+        let pyobject = python_of_int_tree tree in
+        print_endline (Py.Object.to_string pyobject);
+        printf !"%{sexp:int_tree}\n%!" (int_tree_of_python pyobject));
+    [%expect
+      {|
+      (Leaf 42)
+      ('Leaf', (42,))
+      (Leaf 42)
+      (Node (Leaf 1) (Leaf 2))
+      ('Node', (('Leaf', (1,)), ('Leaf', (2,))))
+      (Node (Leaf 1) (Leaf 2))
+      (Node (Node (Leaf 1) (Node (Leaf 2) (Leaf 3))) (Leaf 4))
+      ('Node', (('Node', (('Leaf', (1,)), ('Node', (('Leaf', (2,)), ('Leaf', (3,)))))), ('Leaf', (4,))))
+      (Node (Node (Leaf 1) (Node (Leaf 2) (Leaf 3))) (Leaf 4)) |}]
+  ;;
+end
+
+module Mutually_rec : sig
+  type t =
+    | Base of int
+    | App of t * u
+
+  and u = Lam of t [@@deriving python, sexp]
+end = struct
+  type t =
+    | Base of int
+    | App of t * u
+
+  and u = Lam of t [@@deriving python, sexp]
+
+  let%expect_test "mut-rec" =
+    if not (Py.is_initialized ()) then Py.initialize ~version:3 ();
+    let t = App (Base 42, Lam (App (Base 299792458, Lam (Base 1337)))) in
+    printf !"%{sexp:t}\n%!" t;
+    let pyobject = python_of_t t in
+    print_endline (Py.Object.to_string pyobject);
+    printf !"%{sexp:t}\n%!" (t_of_python pyobject);
+    [%expect
+      {|
+      (App (Base 42) (Lam (App (Base 299792458) (Lam (Base 1337)))))
+      ('App', (('Base', (42,)), ('Lam', (('App', (('Base', (299792458,)), ('Lam', (('Base', (1337,)),)))),))))
+      (App (Base 42) (Lam (App (Base 299792458) (Lam (Base 1337))))) |}]
+  ;;
+end

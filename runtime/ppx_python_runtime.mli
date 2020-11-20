@@ -22,3 +22,5 @@ module Dict_str_keys : sig
   val set : t -> string -> pyobject -> unit
   val find : t -> string -> pyobject
 end
+
+exception Not_found_s of Base.Sexp.t
