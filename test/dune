@@ -1,2 +1,2 @@
 (library (name ppx_python_test) (libraries core)
- (preprocess (pps ppx_jane -allow-unannotated-ignores ppx_python_conv)))
+ (preprocess (pps ppx_jane ppx_python_conv)))
