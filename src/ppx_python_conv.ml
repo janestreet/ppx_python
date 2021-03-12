@@ -204,7 +204,7 @@ end = struct
             of_python_fields fields ~loc args ~wrap:(fun record -> rhs (Some record))
         in
         case
-          ~lhs:(ppat_constant ~loc (Pconst_string (variant.pcd_name.txt, None)))
+          ~lhs:(ppat_constant ~loc (Pconst_string (variant.pcd_name.txt, loc, None)))
           ~guard:None
           ~rhs)
       @ [ case
