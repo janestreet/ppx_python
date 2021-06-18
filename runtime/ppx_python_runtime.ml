@@ -20,7 +20,7 @@ let python_of_option f = function
 ;;
 
 let option_of_python f pyobject =
-  if Caml.( = ) pyobject Py.none then None else Some (f pyobject)
+  if Stdlib.( = ) pyobject Py.none then None else Some (f pyobject)
 ;;
 
 module Dict_str_keys = struct

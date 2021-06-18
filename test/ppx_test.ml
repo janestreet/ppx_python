@@ -33,7 +33,7 @@ let%expect_test "t" =
   let t = { field_a = 42; field_b = "foobar" } in
   let pyobject = python_of_t t in
   let items =
-    Py.Dict.to_bindings_string pyobject |> List.sort ~compare:Caml.compare
+    Py.Dict.to_bindings_string pyobject |> List.sort ~compare:Stdlib.compare
   in
   List.iter items ~f:(fun (key, value) ->
     printf "%s: %s\n%!" key (Py.Object.to_string value));
@@ -401,5 +401,87 @@ end = struct
       (App (Base 42) (Lam (App (Base 299792458) (Lam (Base 1337)))))
       ('App', (('Base', (42,)), ('Lam', (('App', (('Base', (299792458,)), ('Lam', (('Base', (1337,)),)))),))))
       (App (Base 42) (Lam (App (Base 299792458) (Lam (Base 1337))))) |}]
+  ;;
+end
+
+module Polymorphic_variant : sig
+  type tree = [ `Node of int * tree list ] [@@deriving python]
+end = struct
+  type t =
+    [ `A
+    | `B of int
+    | `C of int * string * string
+    | `D
+    ]
+  [@@deriving python, sexp]
+
+  let%expect_test "polymorphic-variant" =
+    if not (Py.is_initialized ()) then Py.initialize ~version:3 ();
+    let all = [ `A; `B 42; `C (1337, "alan", "turing"); `D ] in
+    List.iter all ~f:(fun t ->
+      printf !"%{sexp:t}\n%!" t;
+      let pyobject = python_of_t t in
+      print_endline (Py.Object.to_string pyobject);
+      printf !"%{sexp:t}\n%!" (t_of_python pyobject));
+    [%expect
+      {|
+      A
+      ('A', None)
+      A
+      (B 42)
+      ('B', 42)
+      (B 42)
+      (C (1337 alan turing))
+      ('C', (1337, 'alan', 'turing'))
+      (C (1337 alan turing))
+      D
+      ('D', None)
+      D |}]
+  ;;
+
+  type u =
+    { foo : t
+    ; bar : [ `c | `A | `d of [ `c | `d of string ] ]
+    }
+  [@@deriving python, sexp]
+
+  let%expect_test "polymorphic-variant-2" =
+    if not (Py.is_initialized ()) then Py.initialize ~version:3 ();
+    let all = [ { foo = `A; bar = `c }; { foo = `B 42; bar = `d (`d "foobar") } ] in
+    List.iter all ~f:(fun u ->
+      printf !"%{sexp:u}\n%!" u;
+      let pyobject = python_of_u u in
+      print_endline (Py.Object.to_string pyobject);
+      printf !"%{sexp:u}\n%!" (u_of_python pyobject));
+    [%expect
+      {|
+      ((foo A) (bar c))
+      {'foo': ('A', None), 'bar': ('c', None)}
+      ((foo A) (bar c))
+      ((foo (B 42)) (bar (d (d foobar))))
+      {'foo': ('B', 42), 'bar': ('d', ('d', 'foobar'))}
+      ((foo (B 42)) (bar (d (d foobar)))) |}]
+  ;;
+
+  type tree = [ `Node of int * tree list ] [@@deriving python, sexp]
+
+  let%expect_test "polymorphic-variant-tree" =
+    if not (Py.is_initialized ()) then Py.initialize ~version:3 ();
+    let t : tree =
+      `Node (1, [ `Node (2, []); `Node (3, []); `Node (4, [ `Node (5, []) ]) ])
+    in
+    printf !"%{sexp:tree}\n%!" t;
+    let pyobject = python_of_tree t in
+    print_endline (Py.Object.to_string pyobject);
+    printf !"%{sexp:tree}\n%!" (tree_of_python pyobject);
+    [%expect
+      {|
+      (Node (1 ((Node (2 ())) (Node (3 ())) (Node (4 ((Node (5 ()))))))))
+      ('Node', (1, [('Node', (2, [])), ('Node', (3, [])), ('Node', (4, [('Node', (5, []))]))]))
+      (Node (1 ((Node (2 ())) (Node (3 ())) (Node (4 ((Node (5 ())))))))) |}];
+    let t2 = `Node (42, [ t; t; t; t ]) in
+    let t = `Node (1337, [ t; t2; t ]) in
+    printf !"%d" (Caml.compare (tree_of_python (python_of_tree t)) t);
+    [%expect {| 0 |}]
   ;;
 end

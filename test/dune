@@ -1,2 +1,2 @@
-(library (name ppx_python_test) (libraries core)
+(library (name ppx_python_test) (libraries core_kernel.core)
  (preprocess (pps ppx_jane ppx_python_conv)))

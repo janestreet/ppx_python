@@ -28,7 +28,7 @@ let fresh_label =
     ppat_var (Loc.make ~loc label) ~loc, pexp_ident (lident ~loc label) ~loc
 ;;
 
-let raise_errorf ~loc fmt = Location.raise_errorf ~loc (Caml.( ^^ ) "ppx_python: " fmt)
+let raise_errorf ~loc fmt = Location.raise_errorf ~loc (Stdlib.( ^^ ) "ppx_python: " fmt)
 
 (* Generated function names. *)
 let python_of tname = "python_of_" ^ tname
@@ -115,7 +115,7 @@ end = struct
       lid
   ;;
 
-  let rec handle_core_type ~tuple ~var ~constr ct v =
+  let rec handle_core_type ~tuple ~var ~constr ~polymorphic_variant ct v =
     let loc = { ct.ptyp_loc with loc_ghost = true } in
     match ct.ptyp_desc with
     | Ptyp_tuple core_types -> tuple ~loc core_types v
@@ -124,12 +124,20 @@ end = struct
       let lid_loc = change_lidloc_suffix ~f:constr longident_loc in
       let args =
         List.map args ~f:(fun arg ->
-          let arg_fn = handle_core_type ~tuple ~var ~constr arg in
+          let arg_fn = handle_core_type ~tuple ~var ~constr ~polymorphic_variant arg in
           closure_of_fn ~loc arg_fn)
         @ [ v ]
       in
       curry_app_list (pexp_ident lid_loc ~loc) args ~loc
-    | Ptyp_alias (alias, _) -> handle_core_type ~tuple ~var ~constr alias v
+    | Ptyp_alias (alias, _) ->
+      handle_core_type ~tuple ~var ~constr ~polymorphic_variant alias v
+    | Ptyp_variant (row_fields, Closed, None) -> polymorphic_variant row_fields ~loc v
+    | Ptyp_variant (_, _, _) ->
+      raise_errorf
+        ~loc
+        "'%a' not supported, only closed variants with no labels are supported"
+        Pprintast.core_type
+        ct
     | _ -> raise_errorf ~loc "'%a' not supported" Pprintast.core_type ct
   ;;
 
@@ -138,6 +146,7 @@ end = struct
       ~tuple:(of_python_tuple ~wrap:Fn.id)
       ~var:of_python_arg
       ~constr:of_python
+      ~polymorphic_variant:of_python_polymorphic_variant
       core_type
       v
 
@@ -158,6 +167,47 @@ end = struct
       if p_len <> [%e tuple_len]
       then Printf.sprintf "tuple size mismatch %d <> %d" [%e tuple_len] p_len |> failwith;
       [%e wrap (pexp_tuple ~loc list)]]
+
+  and of_python_polymorphic_variant row_fields ~loc v =
+    let match_cases ~args =
+      List.map row_fields ~f:(fun { prf_desc; prf_loc = loc; prf_attributes = _ } ->
+        match prf_desc with
+        | Rinherit _ -> raise_errorf ~loc "inherited polymorphic variant not supported"
+        | Rtag (label, has_constant_constructor, ctors) ->
+          let rhs args = pexp_variant ~loc label.txt args in
+          let rhs =
+            match ctors, has_constant_constructor with
+            | [], _ -> rhs None
+            | [ core_type ], false -> rhs (Some (of_python_ty core_type args))
+            | [ _ ], true ->
+              raise_errorf
+                ~loc
+                "cannot have both a constant and non-constant constructor"
+            | _, _ -> raise_errorf ~loc "multiple constructors are not supported"
+          in
+          case
+            ~lhs:(ppat_constant ~loc (Pconst_string (label.txt, loc, None)))
+            ~guard:None
+            ~rhs)
+      @ [ case
+            ~lhs:[%pat? cstor]
+            ~guard:None
+            ~rhs:[%expr failwith (Printf.sprintf "unexpected constructor %s" cstor)]
+        ]
+    in
+    [%expr
+      if not (Py.Tuple.check [%e v])
+      then
+        Printf.sprintf "not a python tuple %s" (Py.Object.to_string [%e v])
+        |> failwith;
+      let p_len = Py.Tuple.size [%e v] in
+      if p_len <> 2
+      then
+        Printf.sprintf "not a python pair %s" (Py.Object.to_string [%e v])
+        |> failwith;
+      let cstor, _args = Py.Tuple.to_pair [%e v] in
+      let cstor = Py.String.to_string cstor in
+      [%e pexp_match ~loc [%expr cstor] (match_cases ~args:[%expr _args])]]
   ;;
 
   let of_python_fields fields ~wrap ~loc v =
@@ -178,7 +228,7 @@ end = struct
         let expr =
           [%expr
             match Ppx_python_runtime.Dict_str_keys.find [%e v] [%e name_as_string] with
-            | exception (Caml.Not_found | Not_found_s _) -> [%e default_branch]
+            | exception (Stdlib.Not_found | Not_found_s _) -> [%e default_branch]
             | v -> [%e of_python_ty field.pld_type [%expr v]]]
         in
         lident field.pld_name.txt ~loc, expr)
@@ -233,7 +283,13 @@ end = struct
       let pat, expr = to_python_tuple ~loc core_types in
       pexp_let ~loc Nonrecursive [ value_binding ~loc ~pat ~expr:v ] expr
     in
-    handle_core_type ~tuple ~var:python_of_arg ~constr:python_of core_type v
+    handle_core_type
+      ~tuple
+      ~var:python_of_arg
+      ~constr:python_of
+      ~polymorphic_variant:to_polymorphic_variant
+      core_type
+      v
 
   and to_python_tuple ~loc core_types =
     let var_name i = "t" ^ Int.to_string i in
@@ -246,6 +302,33 @@ end = struct
         to_python_ty core_type (pexp_ident (lident (var_name i) ~loc) ~loc))
     in
     pat, app_list [%expr Py.Tuple.of_list] ~loc list
+
+  and to_polymorphic_variant row_fields ~loc v =
+    let match_cases =
+      List.map row_fields ~f:(fun { prf_desc; prf_loc = loc; prf_attributes = _ } ->
+        match prf_desc with
+        | Rinherit _ -> raise_errorf ~loc "inherited polymorphic variant not supported"
+        | Rtag (label, has_constant_constructor, ctors) ->
+          let constructor = estring ~loc label.txt in
+          let args_lhs, args_rhs =
+            match ctors, has_constant_constructor with
+            | [], _ -> None, [%expr Py.none]
+            | [ core_type ], false -> Some [%pat? t], to_python_ty core_type [%expr t]
+            | [ _ ], true ->
+              raise_errorf
+                ~loc
+                "cannot have both a constant and non-constant constructor"
+            | _, _ -> raise_errorf ~loc "multiple constructors are not supported"
+          in
+          case
+            ~lhs:(ppat_variant ~loc label.txt args_lhs)
+            ~guard:None
+            ~rhs:
+              [%expr
+                Py.Tuple.of_pair
+                  (Py.String.of_string [%e constructor], [%e args_rhs])])
+    in
+    pexp_match ~loc v match_cases
   ;;
 
   let to_python_fields fields ~loc v =
