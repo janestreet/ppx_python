@@ -485,3 +485,94 @@ end = struct
     [%expect {| 0 |}]
   ;;
 end
+
+module Extra_field_test = struct
+  type t =
+    { field_a : int
+    ; field_b : string
+    ; field_c : float
+    }
+  [@@deriving python, sexp] [@@python.disallow_extra_fields]
+
+  type t_allow =
+    { field_a : int
+    ; field_b : string
+    }
+  [@@deriving python, sexp]
+
+  type t_disallow =
+    { field_a : int
+    ; field_b : string
+    }
+  [@@deriving python, sexp] [@@python.disallow_extra_fields]
+
+  let%expect_test "extra-field-test" =
+    if not (Py.is_initialized ()) then Py.initialize ~version:3 ();
+    let t = { field_a = 42; field_b = "aturing"; field_c = 3.141592653589 } in
+    let pyobject = python_of_t t in
+    let try_extract f = Or_error.try_with (fun () -> f pyobject) in
+    printf !"%{sexp:t_allow Or_error.t}\n%!" (try_extract t_allow_of_python);
+    printf !"%{sexp:t_disallow Or_error.t}\n%!" (try_extract t_disallow_of_python);
+    Py.Dict.set_item_string pyobject "another_extra_field" Py.none;
+    printf !"%{sexp:t_allow Or_error.t}\n%!" (try_extract t_allow_of_python);
+    printf !"%{sexp:t_disallow Or_error.t}\n%!" (try_extract t_disallow_of_python);
+    Py.Dict.del_item_string pyobject "another_extra_field";
+    Py.Dict.del_item_string pyobject "field_c";
+    printf !"%{sexp:t_allow Or_error.t}\n%!" (try_extract t_allow_of_python);
+    printf !"%{sexp:t_disallow Or_error.t}\n%!" (try_extract t_disallow_of_python);
+    Py.Dict.del_item_string pyobject "field_b";
+    printf !"%{sexp:t_allow Or_error.t}\n%!" (try_extract t_allow_of_python);
+    printf !"%{sexp:t_disallow Or_error.t}\n%!" (try_extract t_disallow_of_python);
+    [%expect
+      {|
+      (Ok ((field_a 42) (field_b aturing)))
+      (Error (Failure "unexpected extra field names 'field_c'"))
+      (Ok ((field_a 42) (field_b aturing)))
+      (Error
+       (Failure "unexpected extra field names 'field_c','another_extra_field'"))
+      (Ok ((field_a 42) (field_b aturing)))
+      (Ok ((field_a 42) (field_b aturing)))
+      (Error (Failure "cannot find field field_b in dict"))
+      (Error (Failure "cannot find field field_b in dict")) |}]
+  ;;
+
+  type t_with_default =
+    { f_a : int
+    ; f_b : string [@python.default "foobar"]
+    ; f_c : float
+    }
+  [@@deriving python, sexp] [@@python.disallow_extra_fields]
+
+  let%expect_test "extra-field-with-default-test" =
+    if not (Py.is_initialized ()) then Py.initialize ~version:3 ();
+    let extract_and_print bindings =
+      let pyobject = Py.Dict.of_bindings_string bindings in
+      printf
+        !"%{sexp:t_with_default Or_error.t}\n%!"
+        (Or_error.try_with (fun () -> t_with_default_of_python pyobject))
+    in
+    extract_and_print
+      [ "f_a", python_of_int 1
+      ; "f_b", python_of_string "barfoo"
+      ; "f_c", python_of_float 3.141592
+      ];
+    extract_and_print
+      [ "f_a", python_of_int 1
+      ; "f_bb", python_of_string "barfoo"
+      ; "f_b", python_of_string "barfoo"
+      ; "f_c", python_of_float 3.141592
+      ];
+    extract_and_print
+      [ "f_a", python_of_int 1
+      ; "f_bb", python_of_string "barfoo"
+      ; "f_c", python_of_float 3.141592
+      ];
+    extract_and_print [ "f_a", python_of_int 1; "f_c", python_of_float 3.141592 ];
+    [%expect
+      {|
+      (Ok ((f_a 1) (f_b barfoo) (f_c 3.141592)))
+      (Error (Failure "unexpected extra field names 'f_bb'"))
+      (Error (Failure "unexpected extra field names 'f_bb'"))
+      (Ok ((f_a 1) (f_b foobar) (f_c 3.141592))) |}]
+  ;;
+end

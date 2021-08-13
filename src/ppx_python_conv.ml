@@ -18,6 +18,14 @@ let option =
     (fun x -> x)
 ;;
 
+let disallow_extra_fields =
+  Attribute.declare
+    "python.disallow_extra_fields"
+    Attribute.Context.type_declaration
+    Ast_pattern.(pstr nil)
+    ()
+;;
+
 let lident ~loc str = Loc.make ~loc (Lident str)
 
 let fresh_label =
@@ -210,8 +218,8 @@ end = struct
       [%e pexp_match ~loc [%expr cstor] (match_cases ~args:[%expr _args])]]
   ;;
 
-  let of_python_fields fields ~wrap ~loc v =
-    let fields =
+  let of_python_fields fields ~wrap ~loc ~allow_extra_fields v =
+    let record_fields =
       List.map fields ~f:(fun field ->
         let name_as_string = estring ~loc field.pld_name.txt in
         let default_branch =
@@ -229,19 +237,41 @@ end = struct
           [%expr
             match Ppx_python_runtime.Dict_str_keys.find [%e v] [%e name_as_string] with
             | exception (Stdlib.Not_found | Not_found_s _) -> [%e default_branch]
-            | v -> [%e of_python_ty field.pld_type [%expr v]]]
+            | v ->
+              __pyocaml_field_read := !__pyocaml_field_read + 1;
+              [%e of_python_ty field.pld_type [%expr v]]]
         in
         lident field.pld_name.txt ~loc, expr)
+    in
+    let check_extra_fields =
+      if allow_extra_fields
+      then [%expr ()]
+      else (
+        (* The [fail_on_extra_fields] bit is slow but this is ok as it's only used
+           when an error is generated so outside of the path that we're optimizing
+           for. *)
+        let field_names =
+          List.map fields ~f:(fun field -> estring ~loc field.pld_name.txt) |> elist ~loc
+        in
+        [%expr
+          if !__pyocaml_field_read <> Py.Dict.size [%e v]
+          then
+            Ppx_python_runtime.Dict_str_keys.fail_on_extra_fields
+              [%e v]
+              ~expected_field_names:[%e field_names]])
     in
     [%expr
       if not (Py.Dict.check [%e v])
       then
         Printf.sprintf "not a python dict %s" (Py.Object.to_string [%e v])
         |> failwith;
-      [%e wrap (pexp_record fields ~loc None)]]
+      let __pyocaml_field_read = ref 0 in
+      let __pyocaml_res = [%e wrap (pexp_record record_fields ~loc None)] in
+      [%e check_extra_fields];
+      __pyocaml_res]
   ;;
 
-  let of_python_variant variant ~loc v =
+  let of_python_variant variant ~loc ~allow_extra_fields v =
     let match_cases ~args =
       List.map variant ~f:(fun variant ->
         let rhs args = pexp_construct ~loc (lident ~loc variant.pcd_name.txt) args in
@@ -251,7 +281,12 @@ end = struct
           | Pcstr_tuple core_types ->
             of_python_tuple core_types args ~loc ~wrap:(fun v -> rhs (Some v))
           | Pcstr_record fields ->
-            of_python_fields fields ~loc args ~wrap:(fun record -> rhs (Some record))
+            of_python_fields
+              fields
+              ~loc
+              args
+              ~wrap:(fun record -> rhs (Some record))
+              ~allow_extra_fields
         in
         case
           ~lhs:(ppat_constant ~loc (Pconst_string (variant.pcd_name.txt, loc, None)))
@@ -418,7 +453,8 @@ end = struct
   let gen kind =
     let attributes =
       match kind with
-      | `both | `of_ -> [ Attribute.T default ]
+      | `both | `of_ ->
+        [ Attribute.T default; Attribute.T option; Attribute.T disallow_extra_fields ]
       | `to_ -> []
     in
     Deriving.Generator.make_noarg ~attributes (fun ~loc ~path:_ (rec_flag, tds) ->
@@ -431,11 +467,14 @@ end = struct
             ppat_var ~loc (Loc.make name ~loc)
           in
           let expr =
+            let allow_extra_fields =
+              Option.is_none (Attribute.get disallow_extra_fields td)
+            in
             expr_of_td
               ~tvar_wrapper:of_python_arg
               ~type_expr:of_python_ty
-              ~variant:of_python_variant
-              ~record:(of_python_fields ~wrap:Fn.id)
+              ~variant:(of_python_variant ~allow_extra_fields)
+              ~record:(of_python_fields ~wrap:Fn.id ~allow_extra_fields)
               td
           in
           value_binding ~loc ~pat ~expr)

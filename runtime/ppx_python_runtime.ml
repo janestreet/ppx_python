@@ -47,6 +47,17 @@ module Dict_str_keys = struct
     List.iter assoc ~f:(fun (key, value) -> set t key value);
     t
   ;;
+
+  let fail_on_extra_fields dict ~expected_field_names =
+    let expected_field_names = Set.of_list (module String) expected_field_names in
+    Py.Dict.to_bindings_string dict
+    |> List.filter ~f:(fun (dict_field_name, _) ->
+      not (Set.mem expected_field_names dict_field_name))
+    |> List.map ~f:(fun (field_name, _) -> "'" ^ field_name ^ "'")
+    |> String.concat ~sep:","
+    |> Printf.sprintf "unexpected extra field names %s"
+    |> failwith
+  ;;
 end
 
 exception Not_found_s = Not_found_s

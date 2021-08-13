@@ -21,6 +21,7 @@ module Dict_str_keys : sig
   val create : (string * pyobject) list -> t
   val set : t -> string -> pyobject -> unit
   val find : t -> string -> pyobject
+  val fail_on_extra_fields : t -> expected_field_names:string list -> unit
 end
 
 exception Not_found_s of Base.Sexp.t
