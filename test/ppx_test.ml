@@ -83,7 +83,7 @@ let%expect_test "M.u" =
   let v = M.u_of_python int_of_python pyobject in
   printf !"%{sexp:int M.u}\n%!" v;
   [%expect {|
-    (B 12) |}]
+  (B 12) |}]
 ;;
 
 type 'a w =
@@ -306,7 +306,7 @@ let%expect_test "python-of" =
   [%expect {| ((foo 1337) (bar (2.71828182846))) |}]
 ;;
 
-module Recursive_type : sig
+module _ : sig
   (* Export the type to check the mli generation too. *)
   type 'a l =
     | Empty
@@ -376,7 +376,7 @@ end = struct
   ;;
 end
 
-module Mutually_rec : sig
+module _ : sig
   type t =
     | Base of int
     | App of t * u
@@ -404,7 +404,7 @@ end = struct
   ;;
 end
 
-module Polymorphic_variant : sig
+module _ : sig
   type tree = [ `Node of int * tree list ] [@@deriving python]
 end = struct
   type t =
@@ -486,7 +486,7 @@ end = struct
   ;;
 end
 
-module Extra_field_test = struct
+module _ = struct
   type t =
     { field_a : int
     ; field_b : string
@@ -574,5 +574,68 @@ module Extra_field_test = struct
       (Error (Failure "unexpected extra field names 'f_bb'"))
       (Error (Failure "unexpected extra field names 'f_bb'"))
       (Ok ((f_a 1) (f_b foobar) (f_c 3.141592))) |}]
+  ;;
+end
+
+module _ : sig
+  type ('a, 'b, 'c) template =
+    | A of 'a
+    | B of 'b
+    | C of 'c
+  [@@deriving python]
+end = struct
+  type ('a, 'b, 'c) template =
+    | A of 'a
+    | B of 'b
+    | C of 'c
+  [@@deriving python, sexp]
+
+  module Custom = struct
+    type t = int [@@deriving python, sexp]
+  end
+
+  type int_template = (int, int, int) template [@@deriving python, sexp]
+  type float_template = (float, float, float) template [@@deriving python, sexp]
+  type bool_template = (bool, bool, bool) template [@@deriving python, sexp]
+
+  let%expect_test "multi-polymorphic-type" =
+    (* Test python_of_t conversions *)
+    let i = python_of_int_template (A 1) in
+    let f = python_of_float_template (B 1.) in
+    let b = python_of_bool_template (C false) in
+    let custom : (Custom.t, float, bool) template = A 5 in
+    let custom_python =
+      python_of_template Custom.python_of_t python_of_float python_of_bool custom
+    in
+    print_endline (Py.Object.to_string i);
+    print_endline (Py.Object.to_string f);
+    print_endline (Py.Object.to_string b);
+    print_endline (Py.Object.to_string custom_python);
+    [%expect
+      {|
+        ('A', (1,))
+        ('B', (1.0,))
+        ('C', (False,))
+        ('A', (5,))
+    |}];
+    (* Test t_of_python conversions *)
+    let i = int_template_of_python i in
+    let f = float_template_of_python f in
+    let b = bool_template_of_python b in
+    let custom =
+      template_of_python Custom.t_of_python float_of_python bool_of_python custom_python
+    in
+    printf !"%{Sexp}\n%!" (sexp_of_int_template i);
+    printf !"%{Sexp}\n%!" (sexp_of_float_template f);
+    printf !"%{Sexp}\n%!" (sexp_of_bool_template b);
+    printf
+      !"%{Sexp}\n%!"
+      (sexp_of_template Custom.sexp_of_t sexp_of_float sexp_of_bool custom);
+    [%expect {|
+        (A 1)
+        (B 1)
+        (C false)
+        (A 5)
+    |}]
   ;;
 end

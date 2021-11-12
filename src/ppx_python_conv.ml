@@ -74,7 +74,7 @@ end = struct
     let { Location.loc; txt = tname } = td.ptype_name in
     let to_python_type =
       List.fold_left
-        td.ptype_params
+        (List.rev td.ptype_params)
         ~init:
           [%type: [%t Ppxlib.core_type_of_type_declaration td] -> Pytypes.pyobject]
         ~f:(fun acc (tvar, _variance) ->
@@ -82,7 +82,7 @@ end = struct
     in
     let of_python_type =
       List.fold_left
-        td.ptype_params
+        (List.rev td.ptype_params)
         ~init:
           [%type: Pytypes.pyobject -> [%t Ppxlib.core_type_of_type_declaration td]]
         ~f:(fun acc (tvar, _variance) ->
