@@ -38,10 +38,11 @@ type int_pair = (int * int) [@@deriving python_of]
 type int_pair = (int * int) [@@deriving of_python]
 ```
 
-Python converters for primitive types such as `int`, `float`, `bool`, or `string` are automatically brought into
-scope.
+Python converters for primitive types such as `int`, `float`, `bool`,
+or `string` can be brought into scope by opening `Python_lib`.
 
-It is also possible to construct converters based on type expressions as in the following example.
+It is also possible to construct converters based on type expressions
+as in the following example.
 
 ```ocaml
 let pyobject = [%python_of: (int * string) list] [ 1, "one"; 2, "two" ];;
