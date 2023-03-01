@@ -481,7 +481,7 @@ end = struct
       (Node (1 ((Node (2 ())) (Node (3 ())) (Node (4 ((Node (5 ())))))))) |}];
     let t2 = `Node (42, [ t; t; t; t ]) in
     let t = `Node (1337, [ t; t2; t ]) in
-    printf !"%d" (Caml.compare (tree_of_python (python_of_tree t)) t);
+    printf !"%d" (Stdlib.compare (tree_of_python (python_of_tree t)) t);
     [%expect {| 0 |}]
   ;;
 end
