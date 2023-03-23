@@ -188,9 +188,7 @@ end = struct
             | [], _ -> rhs None
             | [ core_type ], false -> rhs (Some (of_python_ty core_type args))
             | [ _ ], true ->
-              raise_errorf
-                ~loc
-                "cannot have both a constant and non-constant constructor"
+              raise_errorf ~loc "cannot have both a constant and non-constant constructor"
             | _, _ -> raise_errorf ~loc "multiple constructors are not supported"
           in
           case
@@ -350,9 +348,7 @@ end = struct
             | [], _ -> None, [%expr Py.none]
             | [ core_type ], false -> Some [%pat? t], to_python_ty core_type [%expr t]
             | [ _ ], true ->
-              raise_errorf
-                ~loc
-                "cannot have both a constant and non-constant constructor"
+              raise_errorf ~loc "cannot have both a constant and non-constant constructor"
             | _, _ -> raise_errorf ~loc "multiple constructors are not supported"
           in
           case
@@ -413,8 +409,7 @@ end = struct
           | Pcstr_tuple core_types ->
             let pat, expr = to_python_tuple ~loc core_types in
             Some pat, expr
-          | Pcstr_record fields ->
-            Some [%pat? t], to_python_fields fields ~loc [%expr t]
+          | Pcstr_record fields -> Some [%pat? t], to_python_fields fields ~loc [%expr t]
         in
         case
           ~lhs:(ppat_construct ~loc (lident ~loc variant.pcd_name.txt) args_lhs)

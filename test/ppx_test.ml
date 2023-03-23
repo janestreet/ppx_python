@@ -207,8 +207,7 @@ let%expect_test "of-python-errors" =
   [%expect {| ocaml exn: (Failure "not a python dict ('A', None)") |}];
   expect_exn (fun () ->
     ignore
-      (t_of_python
-         (python_of_u { foo = 1, 2; bar = { field_a = 1; field_b = "test" } })));
+      (t_of_python (python_of_u { foo = 1, 2; bar = { field_a = 1; field_b = "test" } })));
   [%expect {| ocaml exn: (Failure "cannot find field field_b in dict") |}]
 ;;
 
