@@ -638,3 +638,28 @@ end = struct
     |}]
   ;;
 end
+
+let%expect_test "py_string literal tests" =
+  if not (Py.is_initialized ()) then Py.initialize ();
+  let (some_python_string : Py.Object.t) = [%py_string "python_string!\n"] in
+  let (_ : Py.Object.t) = [%py_string "another python string!\n"] in
+  let sys = Py.Import.import_module "sys" in
+  let sys_stdout = Py.Object.get_attr_string sys "stdout" |> Option.value_exn in
+  let python_stdout_write =
+    Py.Object.get_attr_string sys_stdout "write" |> Option.value_exn
+  in
+  let python_stdout_flush =
+    Py.Object.get_attr_string sys_stdout "flush" |> Option.value_exn
+  in
+  let _none = Py.Callable.to_function python_stdout_write [| some_python_string |] in
+  let _none = Py.Callable.to_function python_stdout_flush [||] in
+  (* let's print the second python string using the lazy cached value from the py_string
+     ppx extension *)
+  let _none =
+    Py.Callable.to_function python_stdout_write [| Lazy.force py_string_1 |]
+  in
+  let _none = Py.Callable.to_function python_stdout_flush [||] in
+  [%expect {|
+    python_string!
+    another python string! |}]
+;;

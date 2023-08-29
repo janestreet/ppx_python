@@ -533,3 +533,43 @@ module Of_python = struct
       ~extension
   ;;
 end
+
+(* [py_string_expressions] maps from the string literal to the expression binding *)
+let py_string_expressions = Hashtbl.create (module String)
+
+let expand ~expr_loc ~string_loc ~string =
+  let loc = { string_loc with loc_ghost = true } in
+  let expr_var, _expr =
+    Hashtbl.find_or_add py_string_expressions string ~default:(fun () ->
+      let expr = [%expr lazy (Py.String.of_string [%e estring string ~loc])] in
+      let len = Hashtbl.length py_string_expressions in
+      let expr_var = Printf.sprintf "py_string_%d" len in
+      expr_var, expr)
+  in
+  [%expr Lazy.force [%e evar expr_var ~loc:expr_loc]]
+;;
+
+let () =
+  Ppxlib.Driver.register_transformation
+    "ppx_python_conv"
+    ~rules:
+      [ Context_free.Rule.extension
+          (Extension.declare
+             "ppx_python_conv.py_string"
+             Extension.Context.expression
+             Ast_pattern.(
+               pstr (pstr_eval (pexp_constant (pconst_string __ __ drop)) nil ^:: nil))
+             (* [delimiter] can be things like "\n". This comes up if we use a multi-line
+                string. *)
+             (fun ~loc:expr_loc ~path:_ string string_loc ->
+                Merlin_helpers.hide_expression (expand ~expr_loc ~string_loc ~string)))
+      ]
+    ~impl:(fun structure ->
+      let loc = Location.none in
+      let header =
+        Hashtbl.data py_string_expressions
+        |> List.map ~f:(fun (key, value) -> [%stri let [%p pvar key ~loc] = [%e value]])
+      in
+      Hashtbl.clear py_string_expressions;
+      header @ structure)
+;;
