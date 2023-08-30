@@ -1,6 +1,5 @@
 open! Base
 
-
 let python_of_bool = Py.Bool.of_bool
 let bool_of_python = Py.Bool.to_bool
 let python_of_int = Py.Int.of_int
@@ -52,7 +51,7 @@ module Dict_str_keys = struct
     let expected_field_names = Set.of_list (module String) expected_field_names in
     Py.Dict.to_bindings_string dict
     |> List.filter ~f:(fun (dict_field_name, _) ->
-      not (Set.mem expected_field_names dict_field_name))
+         not (Set.mem expected_field_names dict_field_name))
     |> List.map ~f:(fun (field_name, _) -> "'" ^ field_name ^ "'")
     |> String.concat ~sep:","
     |> Printf.sprintf "unexpected extra field names %s"

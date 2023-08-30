@@ -32,9 +32,7 @@ let%expect_test "t" =
   if not (Py.is_initialized ()) then Py.initialize ~version:3 ();
   let t = { field_a = 42; field_b = "foobar" } in
   let pyobject = python_of_t t in
-  let items =
-    Py.Dict.to_bindings_string pyobject |> List.sort ~compare:Stdlib.compare
-  in
+  let items = Py.Dict.to_bindings_string pyobject |> List.sort ~compare:Stdlib.compare in
   List.iter items ~f:(fun (key, value) ->
     printf "%s: %s\n%!" key (Py.Object.to_string value));
   [%expect {|
@@ -655,9 +653,7 @@ let%expect_test "py_string literal tests" =
   let _none = Py.Callable.to_function python_stdout_flush [||] in
   (* let's print the second python string using the lazy cached value from the py_string
      ppx extension *)
-  let _none =
-    Py.Callable.to_function python_stdout_write [| Lazy.force py_string_1 |]
-  in
+  let _none = Py.Callable.to_function python_stdout_write [| Lazy.force py_string_1 |] in
   let _none = Py.Callable.to_function python_stdout_flush [||] in
   [%expect {|
     python_string!

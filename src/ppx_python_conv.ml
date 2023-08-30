@@ -75,18 +75,16 @@ end = struct
     let to_python_type =
       List.fold_left
         (List.rev td.ptype_params)
-        ~init:
-          [%type: [%t Ppxlib.core_type_of_type_declaration td] -> Pytypes.pyobject]
+        ~init:[%type: [%t Ppxlib.core_type_of_type_declaration td] -> Pytypes.pyobject]
         ~f:(fun acc (tvar, _variance) ->
-          [%type: ([%t tvar] -> Pytypes.pyobject) -> [%t acc]])
+        [%type: ([%t tvar] -> Pytypes.pyobject) -> [%t acc]])
     in
     let of_python_type =
       List.fold_left
         (List.rev td.ptype_params)
-        ~init:
-          [%type: Pytypes.pyobject -> [%t Ppxlib.core_type_of_type_declaration td]]
+        ~init:[%type: Pytypes.pyobject -> [%t Ppxlib.core_type_of_type_declaration td]]
         ~f:(fun acc (tvar, _variance) ->
-          [%type: (Pytypes.pyobject -> [%t tvar]) -> [%t acc]])
+        [%type: (Pytypes.pyobject -> [%t tvar]) -> [%t acc]])
     in
     let psig_value ~name ~type_ =
       psig_value ~loc (value_description ~loc ~name:(Loc.make name ~loc) ~type_ ~prim:[])
@@ -117,9 +115,9 @@ end = struct
   let change_lidloc_suffix ~f lid =
     Located.map
       (function
-        | Lident str -> Lident (f str)
-        | Ldot (m, str) -> Ldot (m, f str)
-        | Lapply _ -> raise_errorf ~loc:lid.loc "lapply not supported")
+       | Lident str -> Lident (f str)
+       | Ldot (m, str) -> Ldot (m, f str)
+       | Lapply _ -> raise_errorf ~loc:lid.loc "lapply not supported")
       lid
   ;;
 
@@ -168,9 +166,7 @@ end = struct
     let tuple_len = eint (List.length core_types) ~loc in
     [%expr
       if not (Py.Tuple.check [%e v])
-      then
-        Printf.sprintf "not a python tuple %s" (Py.Object.to_string [%e v])
-        |> failwith;
+      then Printf.sprintf "not a python tuple %s" (Py.Object.to_string [%e v]) |> failwith;
       let p_len = Py.Tuple.size [%e v] in
       if p_len <> [%e tuple_len]
       then Printf.sprintf "tuple size mismatch %d <> %d" [%e tuple_len] p_len |> failwith;
@@ -203,14 +199,10 @@ end = struct
     in
     [%expr
       if not (Py.Tuple.check [%e v])
-      then
-        Printf.sprintf "not a python tuple %s" (Py.Object.to_string [%e v])
-        |> failwith;
+      then Printf.sprintf "not a python tuple %s" (Py.Object.to_string [%e v]) |> failwith;
       let p_len = Py.Tuple.size [%e v] in
       if p_len <> 2
-      then
-        Printf.sprintf "not a python pair %s" (Py.Object.to_string [%e v])
-        |> failwith;
+      then Printf.sprintf "not a python pair %s" (Py.Object.to_string [%e v]) |> failwith;
       let cstor, _args = Py.Tuple.to_pair [%e v] in
       let cstor = Py.String.to_string cstor in
       [%e pexp_match ~loc [%expr cstor] (match_cases ~args:[%expr _args])]]
@@ -260,9 +252,7 @@ end = struct
     in
     [%expr
       if not (Py.Dict.check [%e v])
-      then
-        Printf.sprintf "not a python dict %s" (Py.Object.to_string [%e v])
-        |> failwith;
+      then Printf.sprintf "not a python dict %s" (Py.Object.to_string [%e v]) |> failwith;
       let __pyocaml_field_read = ref 0 in
       let __pyocaml_res = [%e wrap (pexp_record record_fields ~loc None)] in
       [%e check_extra_fields];
@@ -298,14 +288,10 @@ end = struct
     in
     [%expr
       if not (Py.Tuple.check [%e v])
-      then
-        Printf.sprintf "not a python tuple %s" (Py.Object.to_string [%e v])
-        |> failwith;
+      then Printf.sprintf "not a python tuple %s" (Py.Object.to_string [%e v]) |> failwith;
       let p_len = Py.Tuple.size [%e v] in
       if p_len <> 2
-      then
-        Printf.sprintf "not a python pair %s" (Py.Object.to_string [%e v])
-        |> failwith;
+      then Printf.sprintf "not a python pair %s" (Py.Object.to_string [%e v]) |> failwith;
       let cstor, _args = Py.Tuple.to_pair [%e v] in
       let cstor = Py.String.to_string cstor in
       [%e pexp_match ~loc [%expr cstor] (match_cases ~args:[%expr _args])]]
@@ -356,8 +342,7 @@ end = struct
             ~guard:None
             ~rhs:
               [%expr
-                Py.Tuple.of_pair
-                  (Py.String.of_string [%e constructor], [%e args_rhs])])
+                Py.Tuple.of_pair (Py.String.of_string [%e constructor], [%e args_rhs])])
     in
     pexp_match ~loc v match_cases
   ;;
@@ -415,9 +400,7 @@ end = struct
           ~lhs:(ppat_construct ~loc (lident ~loc variant.pcd_name.txt) args_lhs)
           ~guard:None
           ~rhs:
-            [%expr
-              Py.Tuple.of_pair
-                (Py.String.of_string [%e constructor], [%e args_rhs])])
+            [%expr Py.Tuple.of_pair (Py.String.of_string [%e constructor], [%e args_rhs])])
     in
     pexp_match ~loc v match_cases
   ;;
@@ -561,8 +544,8 @@ let () =
                pstr (pstr_eval (pexp_constant (pconst_string __ __ drop)) nil ^:: nil))
              (* [delimiter] can be things like "\n". This comes up if we use a multi-line
                 string. *)
-             (fun ~loc:expr_loc ~path:_ string string_loc ->
-                Merlin_helpers.hide_expression (expand ~expr_loc ~string_loc ~string)))
+               (fun ~loc:expr_loc ~path:_ string string_loc ->
+               Merlin_helpers.hide_expression (expand ~expr_loc ~string_loc ~string)))
       ]
     ~impl:(fun structure ->
       let loc = Location.none in
