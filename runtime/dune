@@ -1,2 +1,6 @@
-(library (name ppx_python_runtime) (public_name ppx_python.runtime)
- (libraries base pyml) (preprocess (pps ppx_base)))
+(library
+ (name ppx_python_runtime)
+ (public_name ppx_python.runtime)
+ (libraries base pyml)
+ (preprocess
+  (pps ppx_base)))
