@@ -37,7 +37,8 @@ let%expect_test "t" =
     printf "%s: %s\n%!" key (Py.Object.to_string value));
   [%expect {|
     field_a: 42
-    field_b: foobar |}];
+    field_b: foobar
+    |}];
   let t = t_of_python pyobject in
   printf !"%{Sexp}\n%!" (sexp_of_t t);
   [%expect {| ((field_a 42)(field_b foobar)) |}]
@@ -49,8 +50,7 @@ let%expect_test "v" =
   let pyobject = python_of_v v in
   let v = v_of_python pyobject in
   printf !"%{Sexp}\n%!" (sexp_of_v v);
-  [%expect {|
-    (D((field_a 42)(field_b foobar))pi) |}];
+  [%expect {| (D((field_a 42)(field_b foobar))pi) |}];
   let v = E { x = 42; y = "foobar" } in
   let pyobject = python_of_v v in
   let v = v_of_python pyobject in
@@ -80,8 +80,7 @@ let%expect_test "M.u" =
   let pyobject = M.python_of_u python_of_int v in
   let v = M.u_of_python int_of_python pyobject in
   printf !"%{sexp:int M.u}\n%!" v;
-  [%expect {|
-  (B 12) |}]
+  [%expect {| (B 12) |}]
 ;;
 
 type 'a w =
@@ -95,8 +94,7 @@ let%expect_test "w" =
   let pyobject = python_of_w python_of_int v in
   let v = w_of_python int_of_python pyobject in
   printf !"%{sexp:int w}\n%!" v;
-  [%expect {|
-    (Multi (1 2 3 4)) |}]
+  [%expect {| (Multi (1 2 3 4)) |}]
 ;;
 
 type 'a tree =
@@ -110,8 +108,7 @@ let%expect_test "tree" =
   let pyobject = python_of_tree python_of_string v in
   let v = tree_of_python string_of_python pyobject in
   printf !"%{sexp:string tree}\n%!" v;
-  [%expect {|
-    (Node (Leaf test) (Node (Leaf foo) (Leaf bar))) |}]
+  [%expect {| (Node (Leaf test) (Node (Leaf foo) (Leaf bar))) |}]
 ;;
 
 (* Check that unused type variables are not an issue. *)
@@ -131,8 +128,7 @@ let%expect_test "type-var" =
     z2_of_python (fun _ -> assert false) pyobject
   in
   printf !"%d %d\n%!" (round_trip1 42) (round_trip2 42);
-  [%expect {|
-    42 42 |}]
+  [%expect {| 42 42 |}]
 ;;
 
 module type Test = sig
@@ -182,7 +178,8 @@ let%expect_test "runtime-types" =
     ((bool true) (int 42) (float 3.1415) (string foobar) (array ((1 one)))
      (list ()) (option ()))
     ((bool true) (int 1337) (float 2.71828) (string another-string) (array ())
-     (list (((a b) true) (() false))) (option ())) |}]
+     (list (((a b) true) (() false))) (option ()))
+    |}]
 ;;
 
 let%expect_test "of-python-errors" =
@@ -339,7 +336,8 @@ end = struct
       (Cons foo Empty)
       (Cons foo (Cons bar Empty))
       ('Cons', ('foo', ('Cons', ('bar', ('Empty', None)))))
-      (Cons foo (Cons bar Empty)) |}]
+      (Cons foo (Cons bar Empty))
+      |}]
   ;;
 
   type int_tree =
@@ -369,7 +367,8 @@ end = struct
       (Node (Leaf 1) (Leaf 2))
       (Node (Node (Leaf 1) (Node (Leaf 2) (Leaf 3))) (Leaf 4))
       ('Node', (('Node', (('Leaf', (1,)), ('Node', (('Leaf', (2,)), ('Leaf', (3,)))))), ('Leaf', (4,))))
-      (Node (Node (Leaf 1) (Node (Leaf 2) (Leaf 3))) (Leaf 4)) |}]
+      (Node (Node (Leaf 1) (Node (Leaf 2) (Leaf 3))) (Leaf 4))
+      |}]
   ;;
 end
 
@@ -397,7 +396,8 @@ end = struct
       {|
       (App (Base 42) (Lam (App (Base 299792458) (Lam (Base 1337)))))
       ('App', (('Base', (42,)), ('Lam', (('App', (('Base', (299792458,)), ('Lam', (('Base', (1337,)),)))),))))
-      (App (Base 42) (Lam (App (Base 299792458) (Lam (Base 1337))))) |}]
+      (App (Base 42) (Lam (App (Base 299792458) (Lam (Base 1337)))))
+      |}]
   ;;
 end
 
@@ -433,7 +433,8 @@ end = struct
       (C (1337 alan turing))
       D
       ('D', None)
-      D |}]
+      D
+      |}]
   ;;
 
   type u =
@@ -457,7 +458,8 @@ end = struct
       ((foo A) (bar c))
       ((foo (B 42)) (bar (d (d foobar))))
       {'foo': ('B', 42), 'bar': ('d', ('d', 'foobar'))}
-      ((foo (B 42)) (bar (d (d foobar)))) |}]
+      ((foo (B 42)) (bar (d (d foobar))))
+      |}]
   ;;
 
   type tree = [ `Node of int * tree list ] [@@deriving python, sexp]
@@ -475,7 +477,8 @@ end = struct
       {|
       (Node (1 ((Node (2 ())) (Node (3 ())) (Node (4 ((Node (5 ()))))))))
       ('Node', (1, [('Node', (2, [])), ('Node', (3, [])), ('Node', (4, [('Node', (5, []))]))]))
-      (Node (1 ((Node (2 ())) (Node (3 ())) (Node (4 ((Node (5 ())))))))) |}];
+      (Node (1 ((Node (2 ())) (Node (3 ())) (Node (4 ((Node (5 ()))))))))
+      |}];
     let t2 = `Node (42, [ t; t; t; t ]) in
     let t = `Node (1337, [ t; t2; t ]) in
     printf !"%d" (Stdlib.compare (tree_of_python (python_of_tree t)) t);
@@ -530,7 +533,8 @@ module _ = struct
       (Ok ((field_a 42) (field_b aturing)))
       (Ok ((field_a 42) (field_b aturing)))
       (Error (Failure "cannot find field field_b in dict"))
-      (Error (Failure "cannot find field field_b in dict")) |}]
+      (Error (Failure "cannot find field field_b in dict"))
+      |}]
   ;;
 
   type t_with_default =
@@ -570,7 +574,8 @@ module _ = struct
       (Ok ((f_a 1) (f_b barfoo) (f_c 3.141592)))
       (Error (Failure "unexpected extra field names 'f_bb'"))
       (Error (Failure "unexpected extra field names 'f_bb'"))
-      (Ok ((f_a 1) (f_b foobar) (f_c 3.141592))) |}]
+      (Ok ((f_a 1) (f_b foobar) (f_c 3.141592)))
+      |}]
   ;;
 end
 
@@ -610,11 +615,11 @@ end = struct
     print_endline (Py.Object.to_string custom_python);
     [%expect
       {|
-        ('A', (1,))
-        ('B', (1.0,))
-        ('C', (False,))
-        ('A', (5,))
-    |}];
+      ('A', (1,))
+      ('B', (1.0,))
+      ('C', (False,))
+      ('A', (5,))
+      |}];
     (* Test t_of_python conversions *)
     let i = int_template_of_python i in
     let f = float_template_of_python f in
@@ -629,11 +634,11 @@ end = struct
       !"%{Sexp}\n%!"
       (sexp_of_template Custom.sexp_of_t sexp_of_float sexp_of_bool custom);
     [%expect {|
-        (A 1)
-        (B 1)
-        (C false)
-        (A 5)
-    |}]
+      (A 1)
+      (B 1)
+      (C false)
+      (A 5)
+      |}]
   ;;
 end
 
@@ -657,5 +662,6 @@ let%expect_test "py_string literal tests" =
   let _none = Py.Callable.to_function python_stdout_flush [||] in
   [%expect {|
     python_string!
-    another python string! |}]
+    another python string!
+    |}]
 ;;
