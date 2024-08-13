@@ -14,6 +14,8 @@ val python_of_list : ('a -> pyobject) -> 'a list -> pyobject
 val list_of_python : (pyobject -> 'a) -> pyobject -> 'a list
 val python_of_option : ('a -> pyobject) -> 'a option -> pyobject
 val option_of_python : (pyobject -> 'a) -> pyobject -> 'a option
+val python_of_char : char -> pyobject
+val char_of_python : pyobject -> char
 
 module Dict_str_keys : sig
   type t = pyobject

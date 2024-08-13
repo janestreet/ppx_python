@@ -35,7 +35,8 @@ let%expect_test "t" =
   let items = Py.Dict.to_bindings_string pyobject |> List.sort ~compare:Stdlib.compare in
   List.iter items ~f:(fun (key, value) ->
     printf "%s: %s\n%!" key (Py.Object.to_string value));
-  [%expect {|
+  [%expect
+    {|
     field_a: 42
     field_b: foobar
     |}];
@@ -633,7 +634,8 @@ end = struct
     printf
       !"%{Sexp}\n%!"
       (sexp_of_template Custom.sexp_of_t sexp_of_float sexp_of_bool custom);
-    [%expect {|
+    [%expect
+      {|
       (A 1)
       (B 1)
       (C false)
@@ -660,7 +662,8 @@ let%expect_test "py_string literal tests" =
      ppx extension *)
   let _none = Py.Callable.to_function python_stdout_write [| Lazy.force py_string_1 |] in
   let _none = Py.Callable.to_function python_stdout_flush [||] in
-  [%expect {|
+  [%expect
+    {|
     python_string!
     another python string!
     |}]

@@ -77,14 +77,14 @@ end = struct
         (List.rev td.ptype_params)
         ~init:[%type: [%t Ppxlib.core_type_of_type_declaration td] -> Pytypes.pyobject]
         ~f:(fun acc (tvar, _variance) ->
-        [%type: ([%t tvar] -> Pytypes.pyobject) -> [%t acc]])
+          [%type: ([%t tvar] -> Pytypes.pyobject) -> [%t acc]])
     in
     let of_python_type =
       List.fold_left
         (List.rev td.ptype_params)
         ~init:[%type: Pytypes.pyobject -> [%t Ppxlib.core_type_of_type_declaration td]]
         ~f:(fun acc (tvar, _variance) ->
-        [%type: (Pytypes.pyobject -> [%t tvar]) -> [%t acc]])
+          [%type: (Pytypes.pyobject -> [%t tvar]) -> [%t acc]])
     in
     let psig_value ~name ~type_ =
       psig_value ~loc (value_description ~loc ~name:(Loc.make name ~loc) ~type_ ~prim:[])
@@ -115,9 +115,9 @@ end = struct
   let change_lidloc_suffix ~f lid =
     Located.map
       (function
-       | Lident str -> Lident (f str)
-       | Ldot (m, str) -> Ldot (m, f str)
-       | Lapply _ -> raise_errorf ~loc:lid.loc "lapply not supported")
+        | Lident str -> Lident (f str)
+        | Ldot (m, str) -> Ldot (m, f str)
+        | Lapply _ -> raise_errorf ~loc:lid.loc "lapply not supported")
       lid
   ;;
 
@@ -266,7 +266,10 @@ end = struct
         let rhs =
           match variant.pcd_args with
           | Pcstr_tuple [] -> rhs None
-          | Pcstr_tuple core_types ->
+          | Pcstr_tuple tuple_args ->
+            let core_types =
+              List.map tuple_args ~f:Ppxlib_jane.Shim.Pcstr_tuple_arg.to_core_type
+            in
             of_python_tuple core_types args ~loc ~wrap:(fun v -> rhs (Some v))
           | Pcstr_record fields ->
             of_python_fields
@@ -391,7 +394,10 @@ end = struct
         let args_lhs, args_rhs =
           match variant.pcd_args with
           | Pcstr_tuple [] -> None, [%expr Py.none]
-          | Pcstr_tuple core_types ->
+          | Pcstr_tuple args ->
+            let core_types =
+              List.map args ~f:Ppxlib_jane.Shim.Pcstr_tuple_arg.to_core_type
+            in
             let pat, expr = to_python_tuple ~loc core_types in
             Some pat, expr
           | Pcstr_record fields -> Some [%pat? t], to_python_fields fields ~loc [%expr t]

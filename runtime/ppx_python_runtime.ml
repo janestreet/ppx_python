@@ -22,6 +22,9 @@ let option_of_python f pyobject =
   if Stdlib.( = ) pyobject Py.none then None else Some (f pyobject)
 ;;
 
+let python_of_char char = Char.to_string char |> Py.String.of_string
+let char_of_python py_str = Py.String.to_string py_str |> Char.of_string
+
 module Dict_str_keys = struct
   type t = Pytypes.pyobject
 
@@ -51,7 +54,7 @@ module Dict_str_keys = struct
     let expected_field_names = Set.of_list (module String) expected_field_names in
     Py.Dict.to_bindings_string dict
     |> List.filter ~f:(fun (dict_field_name, _) ->
-         not (Set.mem expected_field_names dict_field_name))
+      not (Set.mem expected_field_names dict_field_name))
     |> List.map ~f:(fun (field_name, _) -> "'" ^ field_name ^ "'")
     |> String.concat ~sep:","
     |> Printf.sprintf "unexpected extra field names %s"
