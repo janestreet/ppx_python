@@ -13,9 +13,10 @@ depends: [
   "ocaml" {>= "5.1.0"}
   "base"
   "ppx_base"
-  "dune"     {>= "3.11.0"}
-  "ppxlib"   {>= "0.28.0"}
-  "pyml"     {>= "20211015"}
+  "ppxlib_jane"
+  "dune"        {>= "3.11.0"}
+  "ppxlib"      {>= "0.33.0"}
+  "pyml"        {>= "20211015"}
 ]
 available: arch != "arm32" & arch != "x86_32"
 synopsis: "[@@deriving] plugin to generate Python conversion functions"
