@@ -68,7 +68,7 @@ let closure_of_fn (fn : expression -> expression) ~loc : expression =
 module Signature : sig
   val gen
     :  [ `to_ | `of_ | `both ]
-    -> (signature, rec_flag * type_declaration list) Deriving.Generator.t
+    -> (signature_item list, rec_flag * type_declaration list) Deriving.Generator.t
 end = struct
   let of_td ~kind td : signature_item list =
     let { Location.loc; txt = tname } = td.ptype_name in
@@ -123,9 +123,12 @@ end = struct
 
   let rec handle_core_type ~tuple ~var ~constr ~polymorphic_variant ct v =
     let loc = { ct.ptyp_loc with loc_ghost = true } in
-    match ct.ptyp_desc with
-    | Ptyp_tuple core_types -> tuple ~loc core_types v
-    | Ptyp_var tv -> [%expr [%e pexp_ident ~loc (lident (var tv) ~loc)] [%e v]]
+    match Ppxlib_jane.Shim.Core_type_desc.of_parsetree ct.ptyp_desc with
+    | Ptyp_tuple labeled_core_types ->
+      (match Ppxlib_jane.as_unlabeled_tuple labeled_core_types with
+       | Some core_types -> tuple ~loc core_types v
+       | None -> raise_errorf ~loc "labeled tuples not supported")
+    | Ptyp_var (tv, _) -> [%expr [%e pexp_ident ~loc (lident (var tv) ~loc)] [%e v]]
     | Ptyp_constr (longident_loc, args) ->
       let lid_loc = change_lidloc_suffix ~f:constr longident_loc in
       let args =
@@ -135,7 +138,7 @@ end = struct
         @ [ v ]
       in
       curry_app_list (pexp_ident lid_loc ~loc) args ~loc
-    | Ptyp_alias (alias, _) ->
+    | Ptyp_alias (alias, _, _) ->
       handle_core_type ~tuple ~var ~constr ~polymorphic_variant alias v
     | Ptyp_variant (row_fields, Closed, None) -> polymorphic_variant row_fields ~loc v
     | Ptyp_variant (_, _, _) ->
@@ -415,8 +418,8 @@ end = struct
     let { Location.loc; txt = _ } = td.ptype_name in
     let tvars =
       List.map td.ptype_params ~f:(fun (te, _variance) ->
-        match te.ptyp_desc with
-        | Ptyp_var lbl -> tvar_wrapper lbl
+        match Ppxlib_jane.Shim.Core_type_desc.of_parsetree te.ptyp_desc with
+        | Ptyp_var (lbl, _) -> tvar_wrapper lbl
         | _ ->
           (* we've called [name_type_params_in_td] *)
           assert false)
